@@ -1,0 +1,59 @@
+---
+title: 'Alaska Paleofire Synthesis: Main'
+author: "Tyler Hoecker"
+date: "6/13/2018"
+output: html_document
+---
+```{r}
+library(dplyr)
+library(purrr)
+library(readr)
+library(tidyr)
+```
+
+Define lakes for biomass burning analysis.
+```{r}
+# Noatak River Basin (data from Higuera et al. 2011)
+noatak <- c('LI','RA','PO','UC')  #c(-60,6780)
+# Brooks Range (data from Higuera et al. 2007,2009)
+brooks <- c('CO','LC','RP','WK','XI') #c(-60,10000)
+# Yukon Flats (data from Kelly et al. 2014)
+yukon  <- c('CP','EP','GA','JA','LD','LT','LU','NR','PI','RE','RO','SL','WC','WI') # c(-60,10000)
+# Copper River Basin (data from Barett et al. 2013)
+copper <- c('CR','HD','MP1','SC') # c(-60,7000)
+# Define list of regions
+regions  <- list('noatak'= noatak,'brooks'= brooks,'yukon'= yukon, 'copper'= copper) %>% 
+  stack() %>% 
+  rename(lake = values, region = ind)
+# Alaska-wide "region"
+alaska <- c(noatak,brooks,yukon,copper)
+```
+
+Master function 
+```{r}
+source(file.path('code','ZIL_Run.r'))
+```
+
+Run for Alaska and all regions using specificed bandwidths (half the width of the moving window, within which the ZIL distribution will be estimated)
+```{r}
+bandWidth   <- 50 
+output_100 <- map(list(alaska, noatak, brooks, yukon, copper),
+                   zil_fn) 
+
+bandWidth   <- 250 	
+output500 <- map(list(alaska, noatak, brooks, yukon, copper),
+                   zil_fn) 
+
+
+output500 <- 
+```
+
+```
+
+
+# Run the script
+```
+
+```{r}
+```
+
