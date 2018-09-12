@@ -9,24 +9,22 @@ library(dplyr)
 library(purrr)
 library(readr)
 library(tidyr)
+library(ggplot2)
+library(broom)
 ```
+
+## Composite indices of biomass burning 
 
 Define lakes for biomass burning analysis.
 ```{r}
 # Noatak River Basin (data from Higuera et al. 2011)
-noatak <- c('LI','RA','PO','UC')  #c(-60,6780)
+noatak <- c('LI','RA','PO','UC')  
 # Brooks Range (data from Higuera et al. 2007,2009)
-brooks <- c('CO','LC','RP','WK','XI') #c(-60,10000)
+brooks <- c('CO','LC','RP','WK','XI') 
 # Yukon Flats (data from Kelly et al. 2014)
-yukon  <- c('CP','EP','GA','JA','LD','LT','LU','NR','PI','RE','RO','SL','WC','WI') # c(-60,10000)
+yukon  <- c('CP','EP','GA','JA','LD','LT','LU','NR','PI','RE','RO','SL','WC','WI') 
 # Copper River Basin (data from Barett et al. 2013)
-copper <- c('CR','HD','MP1','SC') # c(-60,7000)
-# Define list of regions
-regions  <- list('noatak'= noatak,'brooks'= brooks,'yukon'= yukon, 'copper'= copper) %>% 
-  stack() %>% 
-  rename(lake = values, region = ind)
-# Alaska-wide "region"
-alaska <- c(noatak,brooks,yukon,copper)
+copper <- c('CR','HD','MP1','SC') 
 ```
 
 Master function 
@@ -37,23 +35,179 @@ source(file.path('code','ZIL_Run.r'))
 Run for Alaska and all regions using specificed bandwidths (half the width of the moving window, within which the ZIL distribution will be estimated)
 ```{r}
 bandWidth   <- 50 
-output_100 <- map(list(alaska, noatak, brooks, yukon, copper),
-                   zil_fn) 
+output100 <- map(list(alaska, noatak, brooks, yukon, copper),
+                   zil_fn)
+
+compCHAR_100 <- output100 %>% 
+  `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
+  bind_rows(.id = 'region')
 
 bandWidth   <- 250 	
 output500 <- map(list(alaska, noatak, brooks, yukon, copper),
                    zil_fn) 
 
+compCHAR_500 <- output500 %>% 
+  `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
+  bind_rows(.id = 'region')
 
-output500 <- 
+
+compositeCHAR <- full_join(compCHAR_500, compCHAR_100, 
+                           by = c('region', 'yr.bp'),
+                           suffix = c('.500','.100'))
 ```
 
-```
-
-
-# Run the script
-```
-
+Quick plot of 100-year (thin line) and 500-year (thick line w/ CI) Alaska-wide and ecoregional composite indices of biomass burning. 
 ```{r}
+ggplot() +
+  geom_line(data = compCHAR_100, aes(x = yr.bp, y = composite.mean)) +
+  geom_ribbon(data = compCHAR_500, aes(x = yr.bp, ymin = CI.lower, ymax = CI.upper), alpha = 0.3) +
+  geom_line(data = compCHAR_500, aes(x = yr.bp, y = composite.mean), size = 1.25) +
+  facet_wrap(~region) +
+  scale_x_reverse() +
+  coord_cartesian(ylim = c(0,3.5)) +
+  theme_bw() +
+  labs(x = 'Time (cal years BP)', y = 'Biomass burning (standardized CHAR)')
 ```
 
+Re-create Figure 2, illustrating zero-inflated log-normal distribution of CHAR.
+```{r}
+# PLOT HERE
+```
+
+## Composite indices of fire frequency / fire synchrony
+
+#### Percent sites burned per century
+
+Redefine some regions (remove lakes with signal-to-noise index < 3)
+```{r}
+## Update ecoregion parameters
+#  MP1 in Copper River  and XI in Kobuk not suitable for peak analysis
+copper <- c("CR","SC","HD")
+brooks <- c("CO","LC","RP","WK")
+
+# Update 'regions' object
+regions  <- list('noatak'= noatak,'brooks'= brooks,'yukon'= yukon, 'copper'= copper) %>% 
+  stack() %>% 
+  rename(lake = values, region = ind)
+alaska <- c(noatak,brooks,yukon,copper)
+```
+
+Load synchrony (percent of sites burned per century) analysis, as a function, stored in Synchrony_Run.r script.
+```{r}
+source(file.path('code','Synchrony_Run.r'))
+```
+
+Run the regional verrsion of the synchrony analysis. This result is not presented in the main text of the manuscript.
+```{r}
+regional <- 1 #1 for yes, group by region, 0 for no, do all AK together
+pctBurned_reg <- synch_fn(alaska)
+```
+
+View those results:
+```{r}
+ggplot(pctBurned_reg, aes(x = year, y = win.pct)) +
+  geom_step(size = 0.75, color = 'grey50') +
+  geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) +
+  theme_bw() +
+  scale_x_reverse(limits = c(8000,0)) +
+  labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century') +
+  facet_wrap(~region)
+```
+
+Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript.
+```{r}
+regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
+pctBurned_ak <- synch_fn(alaska)
+```
+
+View those results:
+```{r}
+ggplot(pctBurned_ak, aes(x = year, y = boot.median)) +
+  geom_step(size = 0.75, color = 'grey50') +
+  geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01) +
+  geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01) +
+  geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) +
+  theme_bw() +
+  scale_x_reverse(limits = c(8000,0)) +
+  labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century')
+```
+
+#### Fire return intervals 
+
+A 500-yr moving window mean estimate of FRI from peak-CHAR-estimated fire years was calcualted by PEH in MatLab. 
+```{r}
+FRIsmooth = read_csv(file.path('data','peakData','FRI_smooth.csv'))
+FRIsmooth <- FRIsmooth %>% 
+  filter(year_BP <= 8000)
+```
+
+View those results:
+```{r}
+# PLOT HERE
+```
+
+### Combine CHAR and FRI and calculate ratio of CHAR to FRI (i.e., fire severity)
+```{r}
+ratio <- compositeCHAR %>% 
+  filter(region == 'Alaska') %>% 
+  right_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
+  mutate(ratio = composite.mean.500/mFRI_1000,
+         ratio.CIlower = CI.lower.500/CI_l,
+         ratio.CIupper = CI.upper.500/CI_u) %>%
+  select(yr.bp, ratio, ratio.CIlower, ratio.CIupper)
+```
+
+View those results:
+```{r}
+# PLOT HERE
+```
+
+## Climate data
+
+#### Load climate data from Kaufman et al. (2017) and Wiles et al. (2014), and do some light munging.
+```{r}
+# Wiles et al. 2014 data from the Gulf of Alaska ("GOA")
+goa.df = read_csv(file.path('data','climateData','wiles_goa.csv'))
+goa.mean <- mean(goa.df$temp)
+goa.df$yearBP <- 1950- goa.df$yearCE 
+
+goa.df$yearBins <- cut(goa.df$yearBP,include.lowest = T,right = F,
+                       breaks = seq(min(goa.df$yearBP),max(goa.df$yearCE),10), 
+                       labels = seq(min(goa.df$yearBP),2000,10))
+goa.df$zscore = (goa.df$temp - goa.mean) 
+
+goa.binned <- goa.df %>%
+  group_by(yearBins) %>%
+  summarise(bin.temp = mean(temp)) %>%
+  mutate(zscore = (bin.temp - goa.mean)) %>%
+  mutate(sign = ifelse(zscore >= 0,'positive','negative'))
+
+# Kaufman et al. pan-Alaska dataset 
+clim.df = read_csv(file.path('data','climateData','kaufman_paleoclimate_synthesis.csv'))
+clim.df[["tempsign"]] <- ifelse(clim.df[["all.temp"]] >= 0, "positive", "negative")
+clim.df[["moistsign"]] <- ifelse(clim.df[["all.moist"]] >= 0, "positive", "negative")
+```
+
+
+## Re-create Figure 5
+```{r}
+source(file.path('code','plotting_figure_5.r'))
+```
+
+## Correlation analysis
+```{r}
+compositeCHAR %>% 
+  filter(region == 'Alaska') %>% 
+  right_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
+  mutate(ratio = composite.mean.500/mFRI_1000,
+         ratio.CIlower = CI.lower.500/CI_l,
+         ratio.CIupper = CI.upper.500/CI_u) %>%
+  full_join(pctBurned_ak, by = c('yr.bp' = 'year')) %>%
+  select(yr.bp, composite.mean, boot.median,win50,
+         mFRI_1000, mFRI_var, CI_u, CI_l,
+         ratio, ratio.CIlower, ratio.CIupper)
+
+
+
+
+```

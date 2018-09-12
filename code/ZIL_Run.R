@@ -1,3 +1,17 @@
+# This script defines the objects below, and then creates a function which
+# implements the procedure presented in Kelly et al. 2013 for estimating a 
+# composite index of biomass burning from multiple lake-sediment charcoal 
+# records based on the means of zero-inflated log-normal distributions 
+# within 100-year and 500-year wide moving windows, estimated at 
+# 10-year timesteps, and 90% bootstrapped confidence intervals. 
+
+# Define list of regions
+regions  <- list('noatak'= noatak,'brooks'= brooks,'yukon'= yukon, 'copper'= copper) %>% 
+  stack() %>% 
+  rename(lake = values, region = ind)
+# Alaska-wide "region"
+alaska <- c(noatak,brooks,yukon,copper)
+
 zil_fn <- function(lakeList){
   
   # Import raw charcoal count data, standardize and derive CHAR
