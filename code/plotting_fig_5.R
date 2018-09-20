@@ -31,7 +31,7 @@ char.plot <-
 #--------------------------------------------------------------------------
 friPlot <- 
   ggplot(FRIsmooth) + theme_bw(base_size = 14) +
-  geom_point(data = fireYears, aes(x = year, y = FRI), shape = 15, color = 'grey40') +
+  geom_point(data = fireYears_df, aes(x = year, y = FRI), shape = 15, color = 'grey40') +
   geom_line(aes(x = year_BP, y=,mFRI_1000), size = 1) +
   geom_ribbon(aes(x = year_BP, ymin = CI_l, ymax = CI_u), alpha = 0.2) +
   scale_x_reverse(limits = xlimit, breaks = seq(10000,-50,-2000)) +
@@ -70,13 +70,13 @@ ratioPlot <-
 
 # Percent burned
 #--------------------------------------------------------------------------
-ylimit = c(0,170)
+ylimit = c(10,110)
 
 pctBurned_ak <- filter(pctBurned_ak, year <= 8000)
 
 samples = length(!is.na(pctBurned_ak[,'boot.median']))
-xspan = max(pctBurned.ak$year) -
-  min(pctBurned.ak$year)
+xspan = max(pctBurned_ak$year) -
+  min(pctBurned_ak$year)
 span.100 = 500 / (xspan/samples) / samples 
 
 
@@ -102,7 +102,7 @@ ak.pct.TS.plot <-
   scale_x_reverse(limits = xlimit, breaks = seq(10000,-50,-2000)) +
   ylab('Percent\nsites burned') +
   xlab('Time (cal years BP)') +
-  scale_y_continuous(breaks = seq(ylimit[1],ylimit[2],50), position = 'right') +
+  scale_y_continuous(breaks = c(25,50,75,100), position = 'right') +
   theme_bw(base_size = 14) +
   theme(plot.margin=unit(c(-0.1,0.3,0,0.3), "cm"),
         panel.border = element_blank(),
@@ -141,14 +141,15 @@ tempPlot <-
 
 # Plot grid
 #-------------------------------------------------------------------------- 
-cowplot::plot_grid(char.plot,friPlot,ratioPlot, ak.pct.TS.plot,
-          tempPlot,
-          ncol =1, align = 'v', rel_heights = c(1,1,.75,.75,1),
-          labels = "AUTO", hjust = -10)
+fig_5 <- 
+  cowplot::plot_grid(char.plot,friPlot,ratioPlot, ak.pct.TS.plot,
+                     tempPlot,
+                     ncol =1, align = 'v', rel_heights = c(1,1,.75,.75,1),
+                     labels = "AUTO", hjust = -10)
 #-------------------------------------------------------------------------- 
 # 
 ggsave(filename = 'synthesis_ak_stack.pdf',
        height = 12,
-       width = 7,
+       width = 8,
        units = 'in',
        dpi = 600)

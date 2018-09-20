@@ -11,6 +11,8 @@ library(readr)
 library(tidyr)
 library(ggplot2)
 library(broom)
+library(zoo)
+library(truncnorm)
 ```
 
 ## Composite indices of biomass burning 
@@ -25,6 +27,8 @@ brooks <- c('CO','LC','RP','WK','XI')
 yukon  <- c('CP','EP','GA','JA','LD','LT','LU','NR','PI','RE','RO','SL','WC','WI') 
 # Copper River Basin (data from Barett et al. 2013)
 copper <- c('CR','HD','MP1','SC') 
+
+alaska <- c(noatak,brooks,yukon,copper)
 ```
 
 Master function 
@@ -94,19 +98,26 @@ alaska <- c(noatak,brooks,yukon,copper)
 
 Load synchrony (percent of sites burned per century) analysis, as a function, stored in Synchrony_Run.r script.
 ```{r}
-source(file.path('code','Synchrony_Run.r'))
+source(file.path('code','synchrony_funs.r'))
 ```
 
-Run the regional verrsion of the synchrony analysis. This result is not presented in the main text of the manuscript.
+Load the estimated timing of fire events from peak CHAR data.
+```{r}
+fireYears_df <- fireyears_fn(alaska)
+```
+
+Run the regional version of the synchrony analysis. This result is not presented in the main text of the manuscript.
 ```{r}
 regional <- 1 #1 for yes, group by region, 0 for no, do all AK together
-pctBurned_reg <- synch_fn(alaska)
+pctBurned_reg <- synch_fn(fireYears_df)
 ```
 
 View those results:
 ```{r}
-ggplot(pctBurned_reg, aes(x = year, y = win.pct)) +
-  geom_step(size = 0.75, color = 'grey50') +
+ggplot(pctBurned_reg, aes(x = year, y = boot.median)) +
+  geom_step(size = 0.75, color = 'grey50', size = 0.5) +
+  geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01, size = 0.5) +
+  geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01, size = 0.5) +
   geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) +
   theme_bw() +
   scale_x_reverse(limits = c(8000,0)) +
@@ -114,10 +125,10 @@ ggplot(pctBurned_reg, aes(x = year, y = win.pct)) +
   facet_wrap(~region)
 ```
 
-Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript.
+Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript. This portion of the code takes ~6 hours to run, so is commented out here, and loaded from an .RData file.
 ```{r}
 regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
-pctBurned_ak <- synch_fn(alaska)
+pctBurned_ak <- synch_fn(fireYears_df)
 ```
 
 View those results:
@@ -191,23 +202,86 @@ clim.df[["moistsign"]] <- ifelse(clim.df[["all.moist"]] >= 0, "positive", "negat
 
 ## Re-create Figure 5
 ```{r}
-source(file.path('code','plotting_figure_5.r'))
+source(file.path('code','plotting_fig_5.r'))
+fig_5
 ```
 
 ## Correlation analysis
+
+Read in climate data from Kaufman et al. XXXX, a composite Holocene paleoclimate record for Beringia
 ```{r}
-compositeCHAR %>% 
+kaufman_df <- read_csv(file.path('data','climateData','kaufman_paleoclimate_synthesis.csv')) 
+```
+
+
+### Last 10,000 years
+Join all of the charcoal-based metrics together with the climate record, binned into 500-year intervals that correspod with Kaufman record.
+```{r}
+corr_df_10kya <- compositeCHAR %>% 
   filter(region == 'Alaska') %>% 
   right_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
-  mutate(ratio = composite.mean.500/mFRI_1000,
-         ratio.CIlower = CI.lower.500/CI_l,
-         ratio.CIupper = CI.upper.500/CI_u) %>%
+  right_join(ratio, by = 'yr.bp') %>%
   full_join(pctBurned_ak, by = c('yr.bp' = 'year')) %>%
-  select(yr.bp, composite.mean, boot.median,win50,
-         mFRI_1000, mFRI_var, CI_u, CI_l,
-         ratio, ratio.CIlower, ratio.CIupper)
-
-
-
-
+  mutate(bins500 = as.numeric(as.character(cut(.$yr.bp,include.lowest = T, right = T,
+                                            breaks = seq(0,10000,500), 
+                                            labels = seq(250,10000,500)))),
+         bins500 = ifelse(yr.bp < 0, 250, bins500)) %>%
+  group_by(bins500) %>%
+  summarise_all(.funs = function(x){mean(x, na.rm = T)} ) %>%
+  select(-yr.bp) %>% 
+  rename(yr.bp = bins500) %>%
+  full_join(kaufman_df, by = 'yr.bp') %>%
+  filter(yr.bp <= 8000) %>%
+  select(CHAR_500 = composite.mean.500, 
+         CHAR_100 = composite.mean.100, 
+         Pct_Burned = boot.median, 
+         mFRI_1000, 
+         ratio,
+         all_temp = all.temp,
+         all_moist = all.moist,
+         midgeA = midgeA.temp,
+         midgeB = midgeB.temp,
+         pollenAnnual = pollenAnn.temp,
+         pollenSummer = pollenSumm.temp) 
 ```
+
+Calculate Pearson pairwise correlations.
+```{r}
+Hmisc::rcorr(as.matrix(corr_df_10kya), type="pearson") # type can be pearson or spearman
+```
+
+### Last 1200 years
+```{r}
+wiles_df <- read_csv(file.path('data','climateData','wiles_goa.csv')) %>% 
+  mutate(yr.bp = 1950-yearCE)
+
+corr_df_1kya <- wiles_df %>%
+  mutate(bins10 = rev(cut(.$yr.bp,include.lowest = T, right = T,
+                          breaks = seq(1150,-60,-10),
+                          labels = seq(1150,-50,-10)))) %>%
+  mutate(bins10 = as.numeric(as.character(bins10))) %>% 
+  group_by(bins10) %>%
+  summarise_all(.funs = mean) %>%
+  select(-yr.bp, -yearCE) %>%
+  rename(yr.bp = bins10) %>%
+  full_join(.,filter(compositeCHAR, region == 'Alaska')) %>%
+  full_join(pctBurned_ak, by = c('yr.bp' = 'year')) %>%
+  full_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
+  full_join(ratio) %>% 
+  select(CHAR_500 = composite.mean.500, 
+         CHAR_100 = composite.mean.100, 
+         Pct_Burned = boot.median, 
+         mFRI_1000, 
+         ratio,
+         GOAtemp = temp)
+```
+
+Calculate Pearson pairwise correlations.
+```{r}
+Hmisc::rcorr(as.matrix(corr_df_1kya), type="pearson") # type can be pearson or spearman
+```
+
+
+
+
+
