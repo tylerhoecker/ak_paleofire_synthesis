@@ -70,14 +70,14 @@ ratioPlot <-
 
 # Percent burned
 #--------------------------------------------------------------------------
-ylimit = c(10,110)
+ylimit = c(10,150)
 
 pctBurned_ak <- filter(pctBurned_ak, year <= 8000)
 
 samples = length(!is.na(pctBurned_ak[,'boot.median']))
 xspan = max(pctBurned_ak$year) -
   min(pctBurned_ak$year)
-span.100 = 500 / (xspan/samples) / samples 
+span.100 = 100 / (xspan/samples) / samples 
 
 
 loessPlot <- ggplot(pctBurned_ak, aes(x= year)) +
@@ -102,7 +102,7 @@ ak.pct.TS.plot <-
   scale_x_reverse(limits = xlimit, breaks = seq(10000,-50,-2000)) +
   ylab('Percent\nsites burned') +
   xlab('Time (cal years BP)') +
-  scale_y_continuous(breaks = c(25,50,75,100), position = 'right') +
+  scale_y_continuous(breaks = c(50,100,150), position = 'right') +
   theme_bw(base_size = 14) +
   theme(plot.margin=unit(c(-0.1,0.3,0,0.3), "cm"),
         panel.border = element_blank(),

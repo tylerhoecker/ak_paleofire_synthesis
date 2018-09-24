@@ -4,6 +4,7 @@ author: "Tyler Hoecker"
 date: "6/13/2018"
 output: html_document
 ---
+Load required packages.
 ```{r}
 library(dplyr)
 library(purrr)
@@ -14,6 +15,11 @@ library(broom)
 library(zoo)
 library(truncnorm)
 ```
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
 
 ## Composite indices of biomass burning 
 
@@ -112,36 +118,33 @@ regional <- 1 #1 for yes, group by region, 0 for no, do all AK together
 pctBurned_reg <- synch_fn(fireYears_df)
 ```
 
-View those results:
-```{r}
-ggplot(pctBurned_reg, aes(x = year, y = boot.median)) +
-  geom_step(size = 0.75, color = 'grey50', size = 0.5) +
-  geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01, size = 0.5) +
-  geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01, size = 0.5) +
-  geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) +
-  theme_bw() +
-  scale_x_reverse(limits = c(8000,0)) +
-  labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century') +
-  facet_wrap(~region)
+View those results (Figure S2):
+```{r include = FALSE}
+source(file.path('code','plotting_fig_S2.r'))
+fig_S2
 ```
 
 Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript. This portion of the code takes ~6 hours to run, so is commented out here, and loaded from an .RData file.
 ```{r}
-regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
-pctBurned_ak <- synch_fn(fireYears_df)
+#regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
+pctBurned_ak <- pctBurned_reg %>%
+  group_by(year) %>%
+  summarise(boot.median = mean(boot.median,na.rm =T),
+            boot.lower = mean(boot.lower,na.rm =T),
+            boot.upper = mean(boot.upper,na.rm =T))
 ```
 
-View those results:
-```{r}
-ggplot(pctBurned_ak, aes(x = year, y = boot.median)) +
-  geom_step(size = 0.75, color = 'grey50') +
-  geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01) +
-  geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01) +
-  geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) +
-  theme_bw() +
-  scale_x_reverse(limits = c(8000,0)) +
-  labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century')
-```
+<!-- View those results: -->
+<!-- ```{r include = FALSE} -->
+<!-- ggplot(pctBurned_ak, aes(x = year, y = boot.median)) + -->
+<!--   geom_step(size = 0.75, color = 'grey50') + -->
+<!--   geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01) + -->
+<!--   geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01) + -->
+<!--   geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) + -->
+<!--   theme_bw() + -->
+<!--   scale_x_reverse(limits = c(8000,-60)) + -->
+<!--   labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century') -->
+<!-- ``` -->
 
 #### Fire return intervals 
 
@@ -152,10 +155,10 @@ FRIsmooth <- FRIsmooth %>%
   filter(year_BP <= 8000)
 ```
 
-View those results:
-```{r}
-# PLOT HERE
-```
+<!-- View those results: -->
+<!-- ```{r} -->
+<!-- # PLOT HERE -->
+<!-- ``` -->
 
 ### Combine CHAR and FRI and calculate ratio of CHAR to FRI (i.e., fire severity)
 ```{r}
@@ -168,19 +171,24 @@ ratio <- compositeCHAR %>%
   select(yr.bp, ratio, ratio.CIlower, ratio.CIupper)
 ```
 
-View those results:
-```{r}
-# PLOT HERE
-```
+<!-- View those results: -->
+<!-- ```{r} -->
+<!-- ggplot(ratio, aes(x = yr.bp, y = ratio, ymin = ratio.CIlower, ymax = ratio.CIupper)) +  -->
+<!--   theme_bw(base_size = 14) + -->
+<!--   geom_line(size = 1) + -->
+<!--   geom_ribbon(alpha = 0.2) + -->
+<!--   theme_bw() + -->
+<!--   scale_x_reverse(limits = c(8000,-60)) + -->
+<!--   labs(x = 'Time (cal years BP)', y = 'CHAR:FRI (Fire severity)') -->
+<!-- ``` -->
 
 ## Climate data
-
 #### Load climate data from Kaufman et al. (2017) and Wiles et al. (2014), and do some light munging.
 ```{r}
 # Wiles et al. 2014 data from the Gulf of Alaska ("GOA")
 goa.df = read_csv(file.path('data','climateData','wiles_goa.csv'))
 goa.mean <- mean(goa.df$temp)
-goa.df$yearBP <- 1950- goa.df$yearCE 
+goa.df$yearBP <- (1950 - goa.df$yearCE) 
 
 goa.df$yearBins <- cut(goa.df$yearBP,include.lowest = T,right = F,
                        breaks = seq(min(goa.df$yearBP),max(goa.df$yearCE),10), 
@@ -201,7 +209,7 @@ clim.df[["moistsign"]] <- ifelse(clim.df[["all.moist"]] >= 0, "positive", "negat
 
 
 ## Re-create Figure 5
-```{r}
+```{r fig.height = 8, fig.width = 5.5}
 source(file.path('code','plotting_fig_5.r'))
 fig_5
 ```
