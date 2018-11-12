@@ -37,13 +37,16 @@ copper <- c('CR','HD','MP1','SC')
 alaska <- c(noatak,brooks,yukon,copper)
 ```
 
-Master function 
+
+Load functions to implement procedure: maximum likelihood estimation of the zero-inflated log-normal distributions in continuous 100-yr and 500-yr moving windows from 10,000 yr BP to -65 yr BP. Run for Alaska and all regions using specificed bandwidths (half the width of the moving window, within which the ZIL distribution will be estimated). 
+This procedure is slow, so alternatively, load pre-run data.
 ```{r}
-source(file.path('code','ZIL_Run.r'))
+# LOAD .RDATA HERE
 ```
 
-Run for Alaska and all regions using specificed bandwidths (half the width of the moving window, within which the ZIL distribution will be estimated)
 ```{r}
+source(file.path('code','ZIL_Run.r'))
+
 bandWidth   <- 50 
 output100 <- map(list(alaska, noatak, brooks, yukon, copper),
                    zil_fn)
@@ -126,12 +129,14 @@ fig_S2
 
 Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript. This portion of the code takes ~6 hours to run, so is commented out here, and loaded from an .RData file.
 ```{r}
-#regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
-pctBurned_ak <- pctBurned_reg %>%
-  group_by(year) %>%
-  summarise(boot.median = mean(boot.median,na.rm =T),
-            boot.lower = mean(boot.lower,na.rm =T),
-            boot.upper = mean(boot.upper,na.rm =T))
+regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
+pctBurned_ak <- synch_fn(fireYears_df)
+
+# pctBurned_ak <- pctBurned_reg %>%
+#   group_by(year) %>%
+#   summarise(boot.median = mean(boot.median,na.rm =T),
+#             boot.lower = mean(boot.lower,na.rm =T),
+#             boot.upper = mean(boot.upper,na.rm =T))
 ```
 
 <!-- View those results: -->
