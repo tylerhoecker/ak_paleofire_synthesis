@@ -55,7 +55,7 @@ compCHAR_100 <- output100 %>%
   `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
   bind_rows(.id = 'region')
 
-bandWidth   <- 250 	
+bandWidth   <- 150 	
 output500 <- map(list(alaska, noatak, brooks, yukon, copper),
                    zil_fn) 
 
@@ -74,12 +74,14 @@ Quick plot of 100-year (thin line) and 500-year (thick line w/ CI) Alaska-wide a
 ggplot() +
   geom_line(data = compCHAR_100, aes(x = yr.bp, y = composite.mean)) +
   geom_ribbon(data = compCHAR_500, aes(x = yr.bp, ymin = CI.lower, ymax = CI.upper), alpha = 0.3) +
-  geom_line(data = compCHAR_500, aes(x = yr.bp, y = composite.mean), size = 1.25) +
+  geom_line(data = compCHAR_500, aes(x = yr.bp, y = composite.mean), size = 1) +
   facet_wrap(~region) +
   scale_x_reverse() +
   coord_cartesian(ylim = c(0,3.5)) +
   theme_bw() +
   labs(x = 'Time (cal years BP)', y = 'Biomass burning (standardized CHAR)')
+
+ggsave('char_50_150.png', height = 7, width = 12)
 ```
 
 Re-create Figure 2, illustrating zero-inflated log-normal distribution of CHAR.

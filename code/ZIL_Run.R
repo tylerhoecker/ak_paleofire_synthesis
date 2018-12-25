@@ -176,6 +176,7 @@ zil_fn <- function(lakeList){
   # Temporal params
   xxStep      <- 10				    # Interval, in years, for moving window
   
+  # Use cut off study period for regions with shorter records
   if ( identical(lakeList, copper) ) {
     ageLim = c(-60,7000)
       } else if ( identical(lakeList, noatak) ) {
@@ -267,25 +268,10 @@ zil_fn <- function(lakeList){
                           x[region.i] <= (xx[j] + bandWidth) )
         
         reg.n.sites = length(unique(site[region.i][ind.x]))
-        
-        if(reg.n.sites > 1 & median(n.regions.contributing[region.i][ind.x]) > 1){
-          w.char[region.i][ind.x] =
-            1/( reg.n.sites *
-                  mean(n.regions.contributing[region.i][ind.x], na.rm=T) )
-          y.w[region.i][ind.x] = 
-            ( y[region.i][ind.x] * w.char[region.i][ind.x] ) *  n.recs.x[region.i][ind.x]
-        }else{
-          y.w[region.i][ind.x] = NA
-        }
+        w.char[region.i][ind.x] = 1/(reg.n.sites*mean(n.regions.contributing[region.i][ind.x], na.rm=T))
       }
     }
-    
-    # Now need to remove some NAs again...
-    y    <- y.w[!is.na(y.w)]
-    x    <- x[!is.na(y.w)]
-    site <- site[!is.na(y.w)]
-    region <- region[!is.na(y.w)]
-    n <- length(y)
+    y = ( y * w.char  *  n.recs.x )
   }
   #------------------------------------------------------------------------
   
