@@ -189,7 +189,8 @@ zil_fn <- function(lakeList){
   alpha       <- 0.1   # Confidence level (0.1 = 90%)
   
   # Index and extract data from large data.frame of CHAR
-  ageLim.ind <- which(charData[,'age']>=(ageLim[1]-bandWidth) & charData[,'age']<=(ageLim[2]+bandWidth))
+  # Hard-code smallest binwidth, so that vectors are the same for both 100-yr and 500-yr curves
+  ageLim.ind <- which(charData[,'age']>=(ageLim[1]-50) & charData[,'age']<=(ageLim[2]+50))
   
   x <- charData[,'age'][ageLim.ind] 
   y <- charData[,'char'][ageLim.ind]
@@ -225,12 +226,12 @@ zil_fn <- function(lakeList){
     site.ends[i,4] = regions[regions[,1] == sites[i],2] 
   }
   
-  n.recs.x = numeric(n);
+  n.recs.x = numeric(n)
   for(i in 1:n) {
     n.recs.x[i] = sum(x[i]>=site.ends[,1] & x[i]<=site.ends[,2])
   }
   
-  n.recs.xx = numeric(nn);
+  n.recs.xx = numeric(nn)
   for( i in 1:nn) {
     n.recs.xx[i] = sum(xx[i]>=site.ends[,1] & xx[i]<=site.ends[,2])
   }
@@ -268,10 +269,10 @@ zil_fn <- function(lakeList){
                           x[region.i] <= (xx[j] + bandWidth) )
         
         reg.n.sites = length(unique(site[region.i][ind.x]))
-        w.char[region.i][ind.x] = 1/(reg.n.sites*mean(n.regions.contributing[region.i][ind.x], na.rm=T))
+        w.char[region.i][ind.x] = 1 / (reg.n.sites * median(n.regions.contributing[region.i][ind.x], na.rm=T)) #
       }
     }
-    y = ( y * w.char  *  n.recs.x )
+    y = ( y * w.char  *  n.recs.x ) 
   }
   #------------------------------------------------------------------------
   

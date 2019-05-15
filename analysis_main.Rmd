@@ -55,7 +55,7 @@ compCHAR_100 <- output100 %>%
   `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
   bind_rows(.id = 'region')
 
-bandWidth   <- 150 	
+bandWidth   <- 250 	
 output500 <- map(list(alaska, noatak, brooks, yukon, copper),
                    zil_fn) 
 
@@ -83,6 +83,31 @@ ggplot() +
 
 ggsave('char_50_150.png', height = 7, width = 12)
 ```
+
+Make a weighted Alaska-wide composite by averaging ecoregions.
+```{r}
+alaska_avg_100 <- compCHAR_100 %>% 
+  filter(region != 'Alaska') %>% 
+  group_by(yr.bp) %>%
+  summarise_if(is.numeric, mean, na.rm = T)
+
+alaska_avg_500 <- compCHAR_500 %>% 
+  filter(region != 'Alaska') %>% 
+  group_by(yr.bp) %>%
+  summarise_if(is.numeric, mean, na.rm = T)
+
+ggplot() +
+  geom_line(data = alaska_avg_100, aes(x = yr.bp, y = composite.mean)) +
+  geom_ribbon(data = alaska_avg_500, aes(x = yr.bp, ymin = CI.lower, ymax = CI.upper), alpha = 0.3) +
+  geom_line(data = alaska_avg_500, aes(x = yr.bp, y = composite.mean), size = 1) +
+  scale_x_reverse() +
+  coord_cartesian(ylim = c(0,3.5)) +
+  theme_bw() +
+  labs(x = 'Time (cal years BP)', y = 'Biomass burning (standardized CHAR)')
+
+ggsave('ak_as_avg.png', height = 7, width = 10)
+```
+
 
 Re-create Figure 2, illustrating zero-inflated log-normal distribution of CHAR.
 ```{r}
