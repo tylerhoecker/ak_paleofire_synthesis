@@ -17,7 +17,7 @@ library(truncnorm)
 ```
 
 ```{r global_options, include=FALSE}
-knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 
@@ -39,10 +39,6 @@ alaska <- c(noatak,brooks,yukon,copper)
 
 
 Load functions to implement procedure: maximum likelihood estimation of the zero-inflated log-normal distributions in continuous 100-yr and 500-yr moving windows from 10,000 yr BP to -65 yr BP. Run for Alaska and all regions using specificed bandwidths (half the width of the moving window, within which the ZIL distribution will be estimated). 
-This procedure is slow, so alternatively, load pre-run data.
-```{r}
-# LOAD .RDATA HERE
-```
 
 ```{r}
 source(file.path('code','ZIL_Run.r'))
@@ -52,66 +48,48 @@ output100 <- map(list(alaska, noatak, brooks, yukon, copper),
                    zil_fn)
 
 compCHAR_100 <- output100 %>% 
-  `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
+  `names<-` (c('Alaska','Noatak River Watershed','Kobuk Ridges and Valleys','Yukon Flats','Copper River Basin')) %>%
   bind_rows(.id = 'region')
 
-bandWidth   <- 250 	
-output500 <- map(list(alaska, noatak, brooks, yukon, copper),
-                   zil_fn) 
+# For reference, hard-coded for now
+spans <- compCHAR_100 %>% 
+  group_by(region) %>% 
+  summarise(span = (1000/10) / n()) 
 
-compCHAR_500 <- output500 %>% 
-  `names<-` (c('Alaska','Noatak','Kobuk','Yukon Flats','Copper')) %>%
-  bind_rows(.id = 'region')
-
-
-compositeCHAR <- full_join(compCHAR_500, compCHAR_100, 
-                           by = c('region', 'yr.bp'),
-                           suffix = c('.500','.100'))
+# Calculate ~500-year mean from loess regression
+compositeCHAR <- compCHAR_100 %>% 
+  group_by(region) %>% 
+  do(augment(loess(composite.mean ~ yr.bp, span = 0.1, data = .), .)) %>% 
+  rename(mean_100 = composite.mean,
+         mean_500 = .fitted) %>% 
+  select(region, yr.bp, mean_100, mean_500, CI.lower, CI.upper) %>% 
+  do(augment(loess(CI.lower ~ yr.bp, span = 0.1, data = .), .)) %>%
+  rename(CI_lower_500 = .fitted) %>%
+  select(-.se.fit, -.resid) %>% 
+  do(augment(loess(CI.upper ~ yr.bp, span = 0.1, data = .), .)) %>%
+  rename(CI_upper_500 = .fitted) %>%
+  select(-.se.fit, -.resid) 
 ```
 
 Quick plot of 100-year (thin line) and 500-year (thick line w/ CI) Alaska-wide and ecoregional composite indices of biomass burning. 
 ```{r}
-ggplot() +
-  geom_line(data = compCHAR_100, aes(x = yr.bp, y = composite.mean)) +
-  geom_ribbon(data = compCHAR_500, aes(x = yr.bp, ymin = CI.lower, ymax = CI.upper), alpha = 0.3) +
-  geom_line(data = compCHAR_500, aes(x = yr.bp, y = composite.mean), size = 1) +
-  facet_wrap(~region) +
-  scale_x_reverse() +
-  coord_cartesian(ylim = c(0,3.5)) +
-  theme_bw() +
-  labs(x = 'Time (cal years BP)', y = 'Biomass burning (standardized CHAR)')
-
-ggsave('char_50_150.png', height = 7, width = 12)
+ggplot(compositeCHAR) + 
+    geom_line(aes(x= yr.bp, y = mean_100), color = 'grey40') +
+    geom_ribbon(aes(x=yr.bp, ymin = CI_lower_500, ymax = CI_upper_500), alpha = 0.2) +
+    geom_line(aes(x=yr.bp,y=mean_500), size = 1) +
+    scale_x_reverse(breaks = seq(10000,-50,-2000)) +
+    scale_y_continuous(breaks = c(1,2,3,4,5,6,7), labels =c(1,2,3,4,5,6,7)) +
+    coord_cartesian(ylim = c(0.3,4)) +
+    ylab("Biomass burning\n(standardized CHAR)") +
+    xlab('Time (cal years BP)') +
+    facet_wrap(~region) +
+    theme_bw()
 ```
-
-Make a weighted Alaska-wide composite by averaging ecoregions.
-```{r}
-alaska_avg_100 <- compCHAR_100 %>% 
-  filter(region != 'Alaska') %>% 
-  group_by(yr.bp) %>%
-  summarise_if(is.numeric, mean, na.rm = T)
-
-alaska_avg_500 <- compCHAR_500 %>% 
-  filter(region != 'Alaska') %>% 
-  group_by(yr.bp) %>%
-  summarise_if(is.numeric, mean, na.rm = T)
-
-ggplot() +
-  geom_line(data = alaska_avg_100, aes(x = yr.bp, y = composite.mean)) +
-  geom_ribbon(data = alaska_avg_500, aes(x = yr.bp, ymin = CI.lower, ymax = CI.upper), alpha = 0.3) +
-  geom_line(data = alaska_avg_500, aes(x = yr.bp, y = composite.mean), size = 1) +
-  scale_x_reverse() +
-  coord_cartesian(ylim = c(0,3.5)) +
-  theme_bw() +
-  labs(x = 'Time (cal years BP)', y = 'Biomass burning (standardized CHAR)')
-
-ggsave('ak_as_avg.png', height = 7, width = 10)
-```
-
 
 Re-create Figure 2, illustrating zero-inflated log-normal distribution of CHAR.
 ```{r}
-# PLOT HERE
+source(file.path('code','plotting_fig_2.r'))
+zil_method_plot
 ```
 
 ## Composite indices of fire frequency / fire synchrony
@@ -142,41 +120,45 @@ Load the estimated timing of fire events from peak CHAR data.
 fireYears_df <- fireyears_fn(alaska)
 ```
 
-Run the regional version of the synchrony analysis. This result is not presented in the main text of the manuscript.
+Run the regional version of the synchrony analysis. This result is presented in the supplemental informaton.
 ```{r}
 regional <- 1 #1 for yes, group by region, 0 for no, do all AK together
 pctBurned_reg <- synch_fn(fireYears_df)
 ```
 
 View those results (Figure S2):
-```{r include = FALSE}
+```{r include = FALSE, fig.height = 10, fig.width = 5}
 source(file.path('code','plotting_fig_S2.r'))
 fig_S2
 ```
 
-Run the Alaska-wide version of the synchrony analysis, as is presented in the manuscript. This portion of the code takes ~6 hours to run, so is commented out here, and loaded from an .RData file.
+Run the Alaska-wide version of the synchrony analysis.
 ```{r}
 regional <- 0 #1 for yes, group by region, 0 for no, do all AK together
 pctBurned_ak <- synch_fn(fireYears_df)
 
-# pctBurned_ak <- pctBurned_reg %>%
-#   group_by(year) %>%
-#   summarise(boot.median = mean(boot.median,na.rm =T),
-#             boot.lower = mean(boot.lower,na.rm =T),
-#             boot.upper = mean(boot.upper,na.rm =T))
+pctBurned_ak <- pctBurned_ak %>% 
+  augment(loess(boot.median ~ year, span = 0.1, data = .), .) %>% 
+  rename(smooth_mean = .fitted) %>% 
+  select(-.se.fit, -.resid) %>% 
+  do(augment(loess(boot.lower ~ year, span = 0.1, data = .), .)) %>%
+  rename(smooth_lower = .fitted) %>%
+  select(-.se.fit, -.resid) %>% 
+  do(augment(loess(boot.upper ~ year, span = 0.1, data = .), .)) %>%
+  rename(smooth_upper = .fitted) %>%
+  select(-.se.fit, -.resid) 
 ```
 
-<!-- View those results: -->
-<!-- ```{r include = FALSE} -->
-<!-- ggplot(pctBurned_ak, aes(x = year, y = boot.median)) + -->
-<!--   geom_step(size = 0.75, color = 'grey50') + -->
-<!--   geom_smooth(aes(x = year, y = boot.upper), color = 'grey50', se = F, method = 'loess', span = 0.01) + -->
-<!--   geom_smooth(aes(x = year, y = boot.lower), color = 'grey50', se = F, method = 'loess', span = 0.01) + -->
-<!--   geom_smooth(size = 1, color = 'black', se = F, method = 'loess', span = 0.01) + -->
-<!--   theme_bw() + -->
-<!--   scale_x_reverse(limits = c(8000,-60)) + -->
-<!--   labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century') -->
-<!-- ``` -->
+View those results:
+```{r include = FALSE}
+ggplot(pctBurned_ak, aes(x = year, y = boot.median)) +
+  geom_step(size = 0.75) +
+  geom_ribbon(aes(ymin = smooth_lower, ymax = smooth_upper), alpha = 0.3) +
+  geom_line(aes(y = smooth_mean), size = 1) +
+  theme_bw() +
+  scale_x_reverse(limits = c(8000,-60)) +
+  labs(x = 'Time (cal years BP)', y = 'Synchrony: Percent sites burned per century')
+```
 
 #### Fire return intervals 
 
@@ -187,32 +169,16 @@ FRIsmooth <- FRIsmooth %>%
   filter(year_BP <= 8000)
 ```
 
-<!-- View those results: -->
-<!-- ```{r} -->
-<!-- # PLOT HERE -->
-<!-- ``` -->
-
 ### Combine CHAR and FRI and calculate ratio of CHAR to FRI (i.e., fire severity)
 ```{r}
 ratio <- compositeCHAR %>% 
   filter(region == 'Alaska') %>% 
   right_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
-  mutate(ratio = composite.mean.500/mFRI_1000,
-         ratio.CIlower = CI.lower.500/CI_l,
-         ratio.CIupper = CI.upper.500/CI_u) %>%
+  mutate(ratio = mean_500/mFRI_1000,
+         ratio.CIlower = CI_lower_500/CI_l,
+         ratio.CIupper = CI_upper_500/CI_u) %>%
   select(yr.bp, ratio, ratio.CIlower, ratio.CIupper)
 ```
-
-<!-- View those results: -->
-<!-- ```{r} -->
-<!-- ggplot(ratio, aes(x = yr.bp, y = ratio, ymin = ratio.CIlower, ymax = ratio.CIupper)) +  -->
-<!--   theme_bw(base_size = 14) + -->
-<!--   geom_line(size = 1) + -->
-<!--   geom_ribbon(alpha = 0.2) + -->
-<!--   theme_bw() + -->
-<!--   scale_x_reverse(limits = c(8000,-60)) + -->
-<!--   labs(x = 'Time (cal years BP)', y = 'CHAR:FRI (Fire severity)') -->
-<!-- ``` -->
 
 ## Climate data
 #### Load climate data from Kaufman et al. (2017) and Wiles et al. (2014), and do some light munging.
@@ -241,8 +207,8 @@ clim.df[["moistsign"]] <- ifelse(clim.df[["all.moist"]] >= 0, "positive", "negat
 
 
 ## Re-create Figure 5
-```{r fig.height = 8, fig.width = 5.5}
-source(file.path('code','plotting_fig_5.r'))
+```{r fig.height = 10, fig.width = 7}
+source(file.path('code','plotting_fig_suppver5.r'))
 fig_5
 ```
 
@@ -262,18 +228,20 @@ corr_df_10kya <- compositeCHAR %>%
   right_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
   right_join(ratio, by = 'yr.bp') %>%
   full_join(pctBurned_ak, by = c('yr.bp' = 'year')) %>%
+  ungroup() %>% 
+  dplyr::select(-region.x) %>% 
   mutate(bins500 = as.numeric(as.character(cut(.$yr.bp,include.lowest = T, right = T,
                                             breaks = seq(0,10000,500), 
                                             labels = seq(250,10000,500)))),
          bins500 = ifelse(yr.bp < 0, 250, bins500)) %>%
   group_by(bins500) %>%
-  summarise_all(.funs = function(x){mean(x, na.rm = T)} ) %>%
+  summarise_if(is.numeric, mean, na.rm = T) %>%
   select(-yr.bp) %>% 
   rename(yr.bp = bins500) %>%
   full_join(kaufman_df, by = 'yr.bp') %>%
   filter(yr.bp <= 8000) %>%
-  select(CHAR_500 = composite.mean.500, 
-         CHAR_100 = composite.mean.100, 
+  dplyr::select(CHAR_500 = mean_500, 
+         CHAR_100 = mean_100, 
          Pct_Burned = boot.median, 
          mFRI_1000, 
          ratio,
@@ -308,8 +276,8 @@ corr_df_1kya <- wiles_df %>%
   full_join(pctBurned_ak, by = c('yr.bp' = 'year')) %>%
   full_join(FRIsmooth, by = c('yr.bp' = 'year_BP')) %>%
   full_join(ratio) %>% 
-  select(CHAR_500 = composite.mean.500, 
-         CHAR_100 = composite.mean.100, 
+  select(CHAR_500 = mean_500, 
+         CHAR_100 = mean_100, 
          Pct_Burned = boot.median, 
          mFRI_1000, 
          ratio,

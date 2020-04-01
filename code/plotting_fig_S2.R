@@ -1,4 +1,6 @@
 # Regional time series
+xlimit = c(10000,-60)
+
 synchPlots = function(df,xlimit,xaxis,ylabel,top){
   
   df <- filter(df, year <= 8000)

@@ -7,7 +7,7 @@
 
 # Define list of regions
 regions  <- list('noatak'= noatak,'brooks'= brooks,'yukon'= yukon, 'copper'= copper) %>% 
-  stack() %>% 
+  utils::stack() %>% 
   rename(lake = values, region = ind)
 # Alaska-wide "region"
 alaska <- c(noatak,brooks,yukon,copper)
@@ -24,6 +24,9 @@ zil_fn <- function(lakeList){
     zX = (logX - mean(logX, na.rm = T)) / sd(logX, na.rm = T)
     expX = exp(zX)
     expX[is.na(expX)] = 0
+    # TEST
+    #expX[expX > 4] = 4
+    
     return(expX)
   }
   
@@ -40,9 +43,8 @@ zil_fn <- function(lakeList){
     mutate(age = round(mean(c(ageTop,ageBot)))) %>% 
     full_join(regions, by = 'lake') %>% 
     select(char, age, lake, region) %>% 
-    as.data.frame()
+    as.data.frame() 
   
-
   #------------------------------------------------------------------------
 
   # Load functions that define ZIL distribution
@@ -258,7 +260,6 @@ zil_fn <- function(lakeList){
     # y.uW <- y
     
     # Weight CHAR so that all regions contribute equally to the mean MLE
-    # Mulitply CHAR by the weight, rescale by multiplying again by the number of total records at that timestep
     w.char = rep(NA,n)
     y.w = rep(NA,n)
     
@@ -272,6 +273,7 @@ zil_fn <- function(lakeList){
         w.char[region.i][ind.x] = 1 / (reg.n.sites * median(n.regions.contributing[region.i][ind.x], na.rm=T)) #
       }
     }
+    # Mulitply CHAR by the weight, rescale by multiplying again by the number of total records at that timestep
     y = ( y * w.char  *  n.recs.x ) 
   }
   #------------------------------------------------------------------------
@@ -353,7 +355,7 @@ zil_fn <- function(lakeList){
       
       if(fit$convergence != 0) {
         # If optim didn't converge, then leave mu,sd as NA and print a warning.
-        print(paste(i,fit$message));
+        # print(paste(i,fit$message));
         bad.convergence.count = bad.convergence.count+1
       } else {
         # Assuming convergence, store the fitted values.
@@ -367,7 +369,7 @@ zil_fn <- function(lakeList){
     # Compute and save the mean of the distribution specified by the fitted parameters
     meanMLE[i] = ZIlnorm.mean(fitparms[i,]) 
     medMLE[i] = ZIlnorm.median(fitparms[i,])
-    print(paste(i,"of",nn))
+    # print(paste(i,"of",nn)) Turn on to see progress messages
   }
   #------------------------------------------------------------------------
   
@@ -386,7 +388,7 @@ zil_fn <- function(lakeList){
       boot.means[i,] = rep(NA,nboot)
     }
     
-    print(paste(i,"of",nn))
+   # print(paste(i,"of",nn)) Turn this back on to print progress message
   }
   
   out.ci.L = apply(boot.means,1,quantile,probs=alpha/2,na.rm=TRUE)
