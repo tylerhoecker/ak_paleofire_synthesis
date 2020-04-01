@@ -5,3 +5,7 @@ To view a summary and explanation of analyses and figures in Hoecker et al. 2020
 
 To reproduce analysis and figures in Hoecker et al. 2020, begin with RMarkdown document, 'analysis_main.Rmd'. This document reproduces all steps of the analysis using data stored in `data/`, calling on additional scripts in `code/` for specific steps. 
 
+
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3736520.svg)](https://doi.org/10.5281/zenodo.3736520)
+
